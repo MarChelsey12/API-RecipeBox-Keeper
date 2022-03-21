@@ -117,7 +117,9 @@ class Recipe(db.Model):
     img = db.Column(db.String)
     date_created = db.Column(db.DateTime, default=dt.utcnow)
     date_updated = db.Column(db.DateTime, onupdate=dt.utcnow)
-    collection_id = db.Column(db.ForeignKey('collection.id'))
+    user_id = db.Column(db.Integer,db.ForeignKey('user.id'))
+    collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'))
+    
 
     def __repr__(self):
         return f'<Recipe: {self.id} | {self.title}>'
@@ -159,7 +161,7 @@ class Collection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    recipes= db.relationship('Recipe', backref="box", lazy="dynamic")
+    card= db.relationship('Recipe', backref="box", lazy="dynamic")
 
 
     def __repr__(self):
@@ -172,6 +174,11 @@ class Collection(db.Model):
     def delete(self):
         db.session.delete(self)
         db.session.commit()
+
+    def from_dict(self, data):
+         for field in ["name", "user_id"]:
+            if field in data:
+                setattr(self, field, data[field])
 
     def to_dict(self):
         return {
@@ -262,7 +269,10 @@ def get_recipes():
     '''
         returns All Recipe information
     '''
-    return make_response({"recipes":[recipe.to_dict() for recipe in Recipe.query.all()]}, 200)
+    card = Recipe.query.get(id)
+    user = g.current_user
+    if card.user_id == user.id:
+        return make_response({"recipes":[recipe.to_dict() for recipe in Recipe.query.all()]}, 200)
 
 @app.get('/recipe/<int:id>')
 @token_auth.login_required()
@@ -270,7 +280,10 @@ def get_recipe(id):
     '''
         returns info for the recipe with the id:id
     '''
-    return make_response(Recipe.query.filter_by(id=id).first().to_dict(), 200)
+    card = Recipe.query.get(id)
+    user = g.current_user
+    if card.user_id == user.id:
+        return make_response(Recipe.query.filter_by(id=id).first().to_dict(), 200)
 
 @app.post('/recipe')
 @token_auth.login_required()
@@ -323,8 +336,87 @@ def put_recipe():
 @app.delete('/recipe/<int:id>')
 @token_auth.login_required()
 def delete_recipe(id):
-    Recipe.query.get(id).delete()
+    card = Recipe.query.get(id)
+    user = g.current_user
+    if not card:
+        abort(404)
+    if not card.user_id == user.id:
+        abort(403)    
+    card.delete()
     return make_response("success",200)
+
+
+
+@app.get('/collection')
+@token_auth.login_required()
+def get_collection():
+    '''
+        returns All collections
+    '''
+    coll = Collection.query.get(id)
+    user = g.current_user
+    if coll.user_id == user.id:
+        return make_response({"Collections":[collection.to_dict() for collection in Collection.query.all()]}, 200)
+
+@app.post('/collection')
+@token_auth.login_required()
+def post_collection():
+    '''
+        Creates a Collection
+        TokenAuth: Bearer TOKEN
+        expected payload:
+        {
+            "name" : STRING,
+            "user_id" : INTEGER,            
+        }
+
+    '''
+    data = request.get_json()
+    new_collection = Collection()
+    new_collection.from_dict(data)
+    new_collection.save()
+    return make_response("success",200)
+
+@app.put('/collection/<int:id>')
+@token_auth.login_required()
+def put_collection(id):
+    '''
+        edits a Collection name
+        TokenAuth: Bearer TOKEN
+        expected payload:
+        {
+            "name" : STRING,           
+        }
+
+    '''
+    data = request.get_json().get("name")
+    edit_coll = Collection.query.get(id)
+    user = g.current_user
+    if not edit_coll:
+        abort(404)
+    if not edit_coll.user_id == user.id:
+        abort(403)
+    edit_coll.name=data
+    edit_coll.save()
+    return make_response("success",200)
+
+@app.delete('/collection/<int:id>')
+@token_auth.login_required()
+def delete_collection():
+    '''
+        Can only be used by the user with <user_id>
+        TokenAuth: Bearer TOKEN
+        Will delete User accesing the endpoint
+    '''
+    coll = Collection.query.get(id)
+    user = g.current_user
+    if not coll:
+        abort(404)
+    if not coll.user_id == user.id:
+        abort(403)    
+    coll.delete()
+    return make_response("success",200)
+
 
 if __name__=="__main__":
     app.run(debug=True) 
