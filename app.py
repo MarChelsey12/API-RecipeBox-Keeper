@@ -158,10 +158,15 @@ class Recipe(db.Model):
         }
 
     def new(self, data):
-        self.title = data["title"]
-        self.ingredients = data["ingredients"]
-        self.instructions = data["instructions"]
-        self.box.name = data["collection_name"]
+         for field in ["title", "ingredients", "instructions", "collection_id"]:
+            if field == "ingredients":
+                for ingredient in data["ingredients"]:
+                    new_ing = Ingredient()
+                    new_ing.from_dict(ingredient)
+                    new_ing.save()
+                    self.ingrediens.append(new_ing)
+            elif field in data:
+                setattr(self, field, data[field])
         
 
 class Ingredient(db.Model):
@@ -327,7 +332,7 @@ def post_recipe():
         expected payload:
         {
             title : STRING,
-            ingredient : STRIING,
+            ingredients : DICT,
             instructions : STRING,
             collection_id : STRING,
             
@@ -349,7 +354,7 @@ def put_recipe():
         expected payload (does not need to include all key value pairsAny omitted values will remain unchanged):
         {
             "title" : STRING,
-            "ingredients" : STRING,
+            "ingredients" : DICT,
             "instructions" : STRING,
             "rating" : STRING,
             "img" : STRING,
