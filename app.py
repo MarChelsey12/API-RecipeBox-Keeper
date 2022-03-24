@@ -142,7 +142,7 @@ class Recipe(db.Model):
         return {
             "id": self.id,
             "title":self.title,
-            "ingredients":self.ingredients,
+            "ingredients" : [recipe.to_dict() for recipe in self.recipes],
             "instruction_id":self.instructions,
             "created_on": self.created_on,
             "rating":self.rating,
@@ -176,8 +176,7 @@ class Ingredient(db.Model):
             "qty":self.qty,
             "unit":self.unit,
             "item":self.item,
-            "recipe_id":self.recipe_id,
-            "ingredients" : [recipe.to_dict() for recipe in self.recipes]
+            "recipe_id":self.recipe_id
         }
 
     def save(self):
