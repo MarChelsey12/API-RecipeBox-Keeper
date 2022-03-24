@@ -135,7 +135,13 @@ class Recipe(db.Model):
 
     def from_dict(self, data):
         for field in ["title", "ingredients", "instructions", "rating", "img", "collection_id"]:
-            if field in data:
+            if field == "ingredients":
+                for ingredient in data["ingredients"]:
+                    new_ing = Ingredient()
+                    new_ing.from_dict(ingredient)
+                    new_ing.save()
+                    self.ingrediens.append(new_ing)
+            elif field in data:
                 setattr(self, field, data[field])
 
     def to_dict(self):
@@ -166,7 +172,7 @@ class Ingredient(db.Model):
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'))
 
     def from_dict(self, data):
-        for field in ["qty", "unit", "item", "recipe_id"]:
+        for field in ["qty", "unit", "item"]:
             if field in data:
                 setattr(self, field, data[field])
 
