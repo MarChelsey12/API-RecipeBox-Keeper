@@ -111,7 +111,7 @@ class User(db.Model):
 class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String)
-    ingredient = db.relationship('Ingrediants', backref="element", lazy="dynamic")
+    ingredients = db.relationship('Ingredient', cascade='all, delete-orphan', backref="element", lazy="dynamic")
     instructions = db.Column(db.Text)
     rating = db.Column(db.String)
     img = db.Column(db.String)
@@ -142,7 +142,7 @@ class Recipe(db.Model):
         return {
             "id": self.id,
             "title":self.title,
-            "ingredient":self.ingredient,
+            "ingredients":self.ingredients,
             "instruction_id":self.instructions,
             "created_on": self.created_on,
             "rating":self.rating,
@@ -158,7 +158,7 @@ class Recipe(db.Model):
         self.box.name = data["collection_name"]
         
 
-class Ingredients(db.Model):
+class Ingredient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     qty = db.Column(db.String)
     unit = db.Column(db.String)
@@ -177,6 +177,7 @@ class Ingredients(db.Model):
             "unit":self.unit,
             "item":self.item,
             "recipe_id":self.recipe_id,
+            "ingredients" : [recipe.to_dict() for recipe in self.recipes]
         }
 
     def save(self):
@@ -321,7 +322,7 @@ def post_recipe():
         expected payload:
         {
             title : STRING,
-            ingredients : INTEGER,
+            ingredient : STRIING,
             instructions : STRING,
             collection_id : STRING,
             
