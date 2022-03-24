@@ -111,12 +111,12 @@ class User(db.Model):
 class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String)
-    ingredients = db.Column(db.Text)
+    ingredient = db.relationship('Ingrediants', backref="element", lazy="dynamic")
     instructions = db.Column(db.Text)
     rating = db.Column(db.String)
     img = db.Column(db.String)
-    date_created = db.Column(db.DateTime, default=dt.utcnow)
-    date_updated = db.Column(db.DateTime, onupdate=dt.utcnow)
+    created_on = db.Column(db.DateTime, default=dt.utcnow)
+    updated_on = db.Column(db.DateTime, onupdate=dt.utcnow)
     user_id = db.Column(db.Integer,db.ForeignKey('user.id'))
     collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'))
     
@@ -140,9 +140,11 @@ class Recipe(db.Model):
 
     def to_dict(self):
         return {
+            "id": self.id,
             "title":self.title,
-            "ingredients":self.ingredients,
-            "instructions":self.instructions,
+            "ingredient":self.ingredient,
+            "instruction_id":self.instructions,
+            "created_on": self.created_on,
             "rating":self.rating,
             "img":self.img,
             "collection_id":self.collection_id,
@@ -153,14 +155,44 @@ class Recipe(db.Model):
         self.title = data["title"]
         self.ingredients = data["ingredients"]
         self.instructions = data["instructions"]
-        self.collection_id = data["collection_id"]
+        self.box.name = data["collection_name"]
         
+
+class Ingredients(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    qty = db.Column(db.String)
+    unit = db.Column(db.String)
+    item = db.Column(db.String)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'))
+
+    def from_dict(self, data):
+        for field in ["qty", "unit", "item", "recipe_id"]:
+            if field in data:
+                setattr(self, field, data[field])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "qty":self.qty,
+            "unit":self.unit,
+            "item":self.item,
+            "recipe_id":self.recipe_id,
+        }
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
 
 
 class Collection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     card= db.relationship('Recipe', backref="box", lazy="dynamic")
 
 
@@ -175,16 +207,11 @@ class Collection(db.Model):
         db.session.delete(self)
         db.session.commit()
 
-    def from_dict(self, data):
-         for field in ["name", "user_id"]:
-            if field in data:
-                setattr(self, field, data[field])
 
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.name,
-            "user_id": self.user_id
         }
 
     ##############
@@ -203,7 +230,7 @@ class Collection(db.Model):
 @basic_auth.login_required()
 def login():
     '''
-        BasicAuth: base64encoded string=> username:password
+        BasicAuth: base64encoded string=> email:password
         Authorization: Basic base64encoded_string
         returns user information including token
     '''
@@ -349,31 +376,24 @@ def delete_recipe(id):
 
 @app.get('/collection')
 @token_auth.login_required()
-def get_collection():
+def get_collections():
     '''
         returns All collections
     '''
-    coll = Collection.query.get(id)
-    user = g.current_user
-    if coll.user_id == user.id:
-        return make_response({"Collections":[collection.to_dict() for collection in Collection.query.all()]}, 200)
+    return make_response({"Collections":[collection.to_dict() for collection in Collection.query.all()]}, 200)
 
 @app.post('/collection')
 @token_auth.login_required()
 def post_collection():
     '''
-        Creates a Collection
-        TokenAuth: Bearer TOKEN
         expected payload:
         {
-            "name" : STRING,
-            "user_id" : INTEGER,            
+            "name" : STRING,            
         }
 
     '''
-    data = request.get_json()
-    new_collection = Collection()
-    new_collection.from_dict(data)
+    data = request.get_json().get("name")
+    new_collection = Collection(name=data)
     new_collection.save()
     return make_response("success",200)
 
@@ -381,8 +401,6 @@ def post_collection():
 @token_auth.login_required()
 def put_collection(id):
     '''
-        edits a Collection name
-        TokenAuth: Bearer TOKEN
         expected payload:
         {
             "name" : STRING,           
@@ -391,11 +409,8 @@ def put_collection(id):
     '''
     data = request.get_json().get("name")
     edit_coll = Collection.query.get(id)
-    user = g.current_user
     if not edit_coll:
         abort(404)
-    if not edit_coll.user_id == user.id:
-        abort(403)
     edit_coll.name=data
     edit_coll.save()
     return make_response("success",200)
@@ -409,11 +424,8 @@ def delete_collection():
         Will delete User accesing the endpoint
     '''
     coll = Collection.query.get(id)
-    user = g.current_user
     if not coll:
-        abort(404)
-    if not coll.user_id == user.id:
-        abort(403)    
+        abort(404)    
     coll.delete()
     return make_response("success",200)
 
